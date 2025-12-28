@@ -7,6 +7,16 @@ WORKDIR /app
 # Copy project files
 COPY . /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    git \
+    git-lfs \
+    && rm -rf /var/lib/apt/lists/* \
+    && git lfs install
+
 # Upgrade pip and install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
