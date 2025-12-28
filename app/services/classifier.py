@@ -6,9 +6,9 @@ import os
 import pandas as pd
 
 # Load model and taxonomy within same folder as this script
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "INatVision_Small_2_fact256_8bit.tflite")
-TAXONOMY_PATH = os.path.join(BASE_DIR, "taxonomy.csv")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(BASE_DIR, "models", "INatVision_Small_2_fact256_8bit.tflite")
+TAXONOMY_PATH = os.path.join(BASE_DIR, "models", "taxonomy.csv")
 
 # Load model
 interpreter = tflite.Interpreter(model_path=MODEL_PATH)
