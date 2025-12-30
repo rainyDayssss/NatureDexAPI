@@ -35,6 +35,8 @@ async def identify_and_enrich(file: UploadFile = File(...)):
     if not scientific_name:
         raise HTTPException(status_code=400, detail="No plant species detected in the image.")
 
+    # Plan to check if scientific_name already existed in database supabase
+
     # -----------------------------------
     # 🔹 PHASE 2: Enrich with iNaturalist API
     # -----------------------------------

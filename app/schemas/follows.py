@@ -9,5 +9,4 @@ class FollowsCreate(FollowsBase):
     pass
 
 class FollowsRead(FollowsBase):
-    model_config = ConfigDict(from_attributes=True)
     id: UUID

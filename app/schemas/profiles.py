@@ -11,7 +11,6 @@ class ProfilesCreate(ProfilesBase):
     pass
 
 class ProfilesRead(ProfilesBase):
-    model_config = ConfigDict(from_attributes=True)
     level: int = 1
     exp: int = 0
     id: UUID

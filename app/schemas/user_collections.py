@@ -12,5 +12,4 @@ class UserCollectionsCreate(UserCollectionsBase):
     pass
 
 class UserCollectionsRead(UserCollectionsBase):
-    model_config = ConfigDict(from_attributes=True)
     id: UUID

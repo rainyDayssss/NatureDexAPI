@@ -10,5 +10,4 @@ class SpeciesCreate(SpeciesBase):
     pass
 
 class SpeciesRead(SpeciesBase):
-    model_config = ConfigDict(from_attributes=True)
     id: UUID
