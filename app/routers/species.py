@@ -9,14 +9,14 @@ router = APIRouter(prefix="/api/species", tags=["Species"])
 hf_client = Client("juppy44/plant-classification")
 
 @router.post("/identify", response_model=SpeciesBase)
-async def identify_and_enrich(file: UploadFile = File(...)):
+async def identify_and_enrich(image: UploadFile = File(...)):
 
     # -----------------------------------
-    # 🔹 PHASE 1: Hugging Face Inference
+    # PHASE 1: Hugging Face Inference
     # -----------------------------------
     try:
         # Save uploaded image temporarily for handle_file
-        image_bytes = await file.read()
+        image_bytes = await image.read()
         temp_file = "temp_input_image.jpg"
         with open(temp_file, "wb") as f:
             f.write(image_bytes)
@@ -24,21 +24,38 @@ async def identify_and_enrich(file: UploadFile = File(...)):
         # HF Prediction
         result = hf_client.predict(
             image=handle_file(temp_file),
-            top_k=5,
+            top_k=1, # the top 1 species
             use_wa_adapter=False,
             api_name="/classify_plant"
         )
+
+        scientific_name = result.get("label")
+        confidence = result.get("confidences", [{}])[0].get("confidence", 0.0)
+
+        # ------------------------------
+        #  PHASE 1B: Confidence Threshold
+        # ------------------------------
+
+        THRESHOLD = 0.1 # adjustable threshold
+        if confidence < THRESHOLD:
+            return {
+                "scientific_name": "Unknown",
+                "common_name": "Unknown",
+                "description": "No plant species detected with sufficient confidence."
+            }
+           
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model Prediction Error: {str(e)}")
 
-    scientific_name = result.get("label")
+    
+
     if not scientific_name:
         raise HTTPException(status_code=400, detail="No plant species detected in the image.")
 
     # Plan to check if scientific_name already existed in database supabase
 
     # -----------------------------------
-    # 🔹 PHASE 2: Enrich with iNaturalist API
+    # PHASE 2: Enrich with iNaturalist API
     # -----------------------------------
     async with httpx.AsyncClient() as client:
         # Step A: Search for taxon ID
@@ -68,10 +85,10 @@ async def identify_and_enrich(file: UploadFile = File(...)):
         detail_data = detail_res.json().get("results", [{}])[0]
 
     # -----------------------------------
-    # 🔹 PHASE 3: Return unified response
+    # PHASE 3: Return unified response
     # -----------------------------------
     return {
         "scientific_name": scientific_name,
         "common_name": detail_data.get("preferred_common_name", scientific_name),
-        "description": detail_data.get("wikipedia_summary", "No summary available.")
+        "description": detail_data.get("wikipedia_summary") or "No summary available."
     }
