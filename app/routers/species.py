@@ -1,30 +1,42 @@
 import httpx
+import os
+from urllib.parse import quote
 from fastapi import APIRouter, UploadFile, HTTPException, File
 from gradio_client import Client, handle_file
 from app.schemas.species import SpeciesBase
+from dotenv import load_dotenv
+load_dotenv()
 
 router = APIRouter(prefix="/api/species", tags=["Species"])
 
-# Initialize once (not inside the function to save startup time)
+# Hugging Face Plant Classifier
 hf_client = Client("juppy44/plant-classification")
+
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", 0.1))
+WIKI_BASE_URL = os.getenv("WIKI_BASE_URL")
+INATURALIST_BASE_URL = os.getenv("INATURALIST_BASE_URL")
+
+headers = {
+    "User-Agent": os.getenv("USER_AGENT")
+}
+
 
 @router.post("/identify", response_model=SpeciesBase)
 async def identify_and_enrich(image: UploadFile = File(...)):
 
-    # -----------------------------------
-    # PHASE 1: Hugging Face Inference
-    # -----------------------------------
+    # -------------------------------
+    # PHASE 1: Hugging Face Classification
+    # -------------------------------
+    temp_file = "temp_input_image.jpg"
+
     try:
-        # Save uploaded image temporarily for handle_file
         image_bytes = await image.read()
-        temp_file = "temp_input_image.jpg"
         with open(temp_file, "wb") as f:
             f.write(image_bytes)
 
-        # HF Prediction
         result = hf_client.predict(
             image=handle_file(temp_file),
-            top_k=1, # the top 1 species
+            top_k=1,
             use_wa_adapter=False,
             api_name="/classify_plant"
         )
@@ -32,63 +44,68 @@ async def identify_and_enrich(image: UploadFile = File(...)):
         scientific_name = result.get("label")
         confidence = result.get("confidences", [{}])[0].get("confidence", 0.0)
 
-        # ------------------------------
-        #  PHASE 1B: Confidence Threshold
-        # ------------------------------
-
-        THRESHOLD = 0.1 # adjustable threshold
-        if confidence < THRESHOLD:
+        if not scientific_name or confidence < CONFIDENCE_THRESHOLD:
             return {
                 "scientific_name": "Unknown",
                 "common_name": "Unknown",
                 "description": "No plant species detected with sufficient confidence."
             }
-           
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model Prediction Error: {str(e)}")
 
-    
+    finally:
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
-    if not scientific_name:
-        raise HTTPException(status_code=400, detail="No plant species detected in the image.")
+    # -------------------------------
+    # PHASE 2: Enrichment (iNaturalist + MediaWiki)
+    # -------------------------------
+    async with httpx.AsyncClient(timeout=10) as client:
 
-    # Plan to check if scientific_name already existed in database supabase
+        # ---- iNaturalist (common name only)
+        search_url = f"{INATURALIST_BASE_URL}?q={quote(scientific_name)}&rank=species"
+        inat_res = await client.get(search_url)
 
-    # -----------------------------------
-    # PHASE 2: Enrich with iNaturalist API
-    # -----------------------------------
-    async with httpx.AsyncClient() as client:
-        # Step A: Search for taxon ID
-        search_url = f"https://api.inaturalist.org/v1/taxa?q={scientific_name}&rank=species"
-        search_res = await client.get(search_url)
+        if inat_res.status_code != 200:
+            raise HTTPException(status_code=502, detail="iNaturalist API unavailable")
 
-        if search_res.status_code != 200:
-            raise HTTPException(status_code=502, detail="iNaturalist Search API unavailable")
+        results = inat_res.json().get("results", [])
+        common_name = results[0].get("preferred_common_name") if results else None
 
-        results = search_res.json().get("results", [])
-        if not results:
-            return {
-                "scientific_name": scientific_name,
-                "common_name": "Unknown",
-                "description": "No species found in the database"
-            }
+        # ---- MediaWiki (description)
+        wiki_url = (
+            f"{WIKI_BASE_URL}"
+            "?action=query"
+            "&format=json"
+            "&prop=extracts"
+            "&exintro=1"
+            "&explaintext=1"
+            "&redirects=1"
+            f"&titles={quote(scientific_name)}"
+        )
 
-        taxon_id = results[0]["id"]
+        wiki_res = await client.get(wiki_url, headers=headers)
+        print(wiki_res)
+        description = "No description available."
+        if wiki_res.status_code == 200:
+            wiki_json = wiki_res.json()
+            pages = wiki_json.get("query", {}).get("pages", {})
 
-        # Step B: Fetch full species details
-        detail_url = f"https://api.inaturalist.org/v1/taxa/{taxon_id}"
-        detail_res = await client.get(detail_url)
+            if pages:
+                # Get the first page in the dict
+                page = next(iter(pages.values()))
 
-        if detail_res.status_code != 200:
-            raise HTTPException(status_code=502, detail="iNaturalist Detail API unavailable")
+                # If page exists (not missing) use extract
+                if not page.get("missing"):
+                    description = page.get("extract", description)
 
-        detail_data = detail_res.json().get("results", [{}])[0]
-
-    # -----------------------------------
-    # PHASE 3: Return unified response
-    # -----------------------------------
+                
+    # -------------------------------
+    # PHASE 3: Unified Response
+    # -------------------------------
     return {
         "scientific_name": scientific_name,
-        "common_name": detail_data.get("preferred_common_name", scientific_name),
-        "description": detail_data.get("wikipedia_summary") or "No summary available."
+        "common_name": common_name or scientific_name,
+        "description": description
     }
