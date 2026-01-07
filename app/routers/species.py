@@ -106,6 +106,7 @@ async def identify_and_enrich(image: UploadFile = File(...)):
                     description = page.get("extract", description)
 
     # TODO: Store spcecies data in the database for future retrieval.
+    # For the imagae provided by inaturalist, just store its url in the species table.
 
     # -------------------------------
     # PHASE 3: Unified Response
