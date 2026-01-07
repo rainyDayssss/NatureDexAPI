@@ -59,4 +59,4 @@ POST an image to /api/species/identify and get:
 
 License
 
-MIT © 2026 [Jhon Rosell B. Talisic]
+MIT © 2026 Jhon Rosell B. Talisic
