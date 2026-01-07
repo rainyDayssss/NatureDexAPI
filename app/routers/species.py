@@ -57,6 +57,9 @@ async def identify_and_enrich(image: UploadFile = File(...)):
     finally:
         if os.path.exists(temp_file):
             os.remove(temp_file)
+    
+    # TODO: Add caching layer here to store previous results and avoid redundant API calls.
+    # So check if species data already exists in the database before proceeding to enrichment.
 
     # -------------------------------
     # PHASE 2: Enrichment (iNaturalist + MediaWiki)
@@ -72,6 +75,8 @@ async def identify_and_enrich(image: UploadFile = File(...)):
 
         results = inat_res.json().get("results", [])
         common_name = results[0].get("preferred_common_name") if results else None
+        # TODO: Further enrichment can be added here, such as observation counts, images, etc.
+        # TODO: Thus also update species models/schemas accordingly.
 
         # ---- MediaWiki (description)
         wiki_url = (
@@ -100,7 +105,8 @@ async def identify_and_enrich(image: UploadFile = File(...)):
                 if not page.get("missing"):
                     description = page.get("extract", description)
 
-                
+    # TODO: Store spcecies data in the database for future retrieval.
+
     # -------------------------------
     # PHASE 3: Unified Response
     # -------------------------------
