@@ -21,7 +21,7 @@ NatureDexAPI is a **plant identification API** for the NatureDex app. Upload a p
 1. Clone and install dependencies:
 
 ```bash
-git clone https://github.com/yourusername/NatureDexAPI.git
+git clone https://github.com/rainyDayssss/NatureDexAPI.git
 cd NatureDexAPI
 python -m venv venv
 # macOS/Linux
@@ -30,24 +30,25 @@ source venv/bin/activate
 venv\Scripts\activate
 pip install -r requirements.txt
 
+```
 2. Add a .env file with:
-
+```
 CONFIDENCE_THRESHOLD=0.1
 USER_AGENT=NatureDexApp/1.0
 WIKI_BASE_URL=https://en.wikipedia.org/w/api.php
 INATURALIST_BASE_URL=https://api.inaturalist.org/v1/taxa
-
+```
 3. Run the API:
-
+```
 uvicorn app.main:app --reload
-
+```
 4. Access Swagger docs:
-
+```
 Access Swagger docs:
-
+```
 
 Usage
-
+```
 POST an image to /api/species/identify and get:
 
 {
@@ -55,7 +56,7 @@ POST an image to /api/species/identify and get:
   "common_name": "Common sunflower",
   "description": "The common sunflower (Helianthus annuus) is a species of large annual forb..."
 }
-
+```
 
 License
 
